@@ -12,8 +12,9 @@ public class AuthRequest {
     @NotBlank(message = "Password is required")
     private String password;
 
-    // For registration only
-    private Long userTypeId;
+    // Changed from userTypeId to role
+    @NotBlank(message = "Role is required")
+    private String role;
 
     // Getters and Setters
     public String getEmail() {
@@ -32,11 +33,11 @@ public class AuthRequest {
         this.password = password;
     }
 
-    public Long getUserTypeId() {
-        return userTypeId;
+    public String getRole() {
+        return role;
     }
 
-    public void setUserTypeId(Long userTypeId) {
-        this.userTypeId = userTypeId;
+    public void setRole(String role) {
+        this.role = role;
     }
 }

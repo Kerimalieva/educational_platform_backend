@@ -39,6 +39,63 @@ public class AuthService {
     @Autowired
     private UserTypeRepository userTypeRepository;
 
+//    @Transactional
+//    public AuthResponse register(AuthRequest authRequest) {
+//        // Check if user already exists
+//        if (userAccountRepository.existsByEmail(authRequest.getEmail())) {
+//            throw new RuntimeException("Email already exists");
+//        }
+//
+//        // Get user type
+//        UserType userType = userTypeRepository.findById(authRequest.getUserTypeId())
+//                .orElseThrow(() -> new RuntimeException("Invalid user type"));
+//
+//        // Create user based on type
+//        UserAccount userAccount;
+//        String encodedPassword = passwordEncoder.encode(authRequest.getPassword());
+//
+//        if (userType.getTypeName().equals("STUDENT")) {
+//            Student student = new Student();
+//            student.setEmail(authRequest.getEmail());
+//            student.setPassword(encodedPassword);
+//            student.setUserType(userType);
+//            userAccount = studentRepository.save(student);
+//        } else if (userType.getTypeName().equals("INSTRUCTOR")) {
+//            Instructor instructor = new Instructor();
+//            instructor.setEmail(authRequest.getEmail());
+//            instructor.setPassword(encodedPassword);
+//            instructor.setUserType(userType);
+//            userAccount = instructorRepository.save(instructor);
+//        } else {
+//            UserAccount newUser = new UserAccount();
+//            newUser.setEmail(authRequest.getEmail());
+//            newUser.setPassword(encodedPassword);
+//            newUser.setUserType(userType);
+//            userAccount = userAccountRepository.save(newUser);
+//        }
+//
+//        // Authenticate the user
+//        Authentication authentication = authenticationManager.authenticate(
+//                new UsernamePasswordAuthenticationToken(authRequest.getEmail(), authRequest.getPassword())
+//        );
+//
+//        SecurityContextHolder.getContext().setAuthentication(authentication);
+//        String jwt = jwtUtil.generateToken(
+//                (org.springframework.security.core.userdetails.User) authentication.getPrincipal()
+//        );
+//
+//        // Create response
+//        AuthResponse response = new AuthResponse();
+//        response.setToken(jwt);
+//        response.setEmail(userAccount.getEmail());
+//        response.setFirstName(userAccount.getFirstName());
+//        response.setLastName(userAccount.getLastName());
+//        response.setUserId(userAccount.getUserAccountId());
+//        response.setUserType(userType.getTypeName());
+//
+//        return response;
+//    }
+
     @Transactional
     public AuthResponse register(AuthRequest authRequest) {
         // Check if user already exists
@@ -46,35 +103,40 @@ public class AuthService {
             throw new RuntimeException("Email already exists");
         }
 
-        // Get user type
-        UserType userType = userTypeRepository.findById(authRequest.getUserTypeId())
+        // Get user type by role name
+        String roleName = authRequest.getRole().toUpperCase(); // "student" -> "STUDENT"
+        UserType userType = userTypeRepository.findByTypeName(roleName)
                 .orElseThrow(() -> new RuntimeException("Invalid user type"));
 
         // Create user based on type
         UserAccount userAccount;
         String encodedPassword = passwordEncoder.encode(authRequest.getPassword());
 
-        if (userType.getTypeName().equals("STUDENT")) {
-            Student student = new Student();
-            student.setEmail(authRequest.getEmail());
-            student.setPassword(encodedPassword);
-            student.setUserType(userType);
-            userAccount = studentRepository.save(student);
-        } else if (userType.getTypeName().equals("INSTRUCTOR")) {
-            Instructor instructor = new Instructor();
-            instructor.setEmail(authRequest.getEmail());
-            instructor.setPassword(encodedPassword);
-            instructor.setUserType(userType);
-            userAccount = instructorRepository.save(instructor);
-        } else {
-            UserAccount newUser = new UserAccount();
-            newUser.setEmail(authRequest.getEmail());
-            newUser.setPassword(encodedPassword);
-            newUser.setUserType(userType);
-            userAccount = userAccountRepository.save(newUser);
+        switch (roleName) {
+            case "STUDENT":
+                Student student = new Student();
+                student.setEmail(authRequest.getEmail());
+                student.setPassword(encodedPassword);
+                student.setUserType(userType);
+                userAccount = studentRepository.save(student);
+                break;
+            case "INSTRUCTOR":
+                Instructor instructor = new Instructor();
+                instructor.setEmail(authRequest.getEmail());
+                instructor.setPassword(encodedPassword);
+                instructor.setUserType(userType);
+                userAccount = instructorRepository.save(instructor);
+                break;
+            default:
+                UserAccount newUser = new UserAccount();
+                newUser.setEmail(authRequest.getEmail());
+                newUser.setPassword(encodedPassword);
+                newUser.setUserType(userType);
+                userAccount = userAccountRepository.save(newUser);
+                break;
         }
 
-        // Authenticate the user
+        // Authenticate the user and generate JWT
         Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(authRequest.getEmail(), authRequest.getPassword())
         );
@@ -95,6 +157,7 @@ public class AuthService {
 
         return response;
     }
+
 
     public AuthResponse login(AuthRequest authRequest) {
         Authentication authentication = authenticationManager.authenticate(
