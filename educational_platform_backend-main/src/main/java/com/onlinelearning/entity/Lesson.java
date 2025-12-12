@@ -15,6 +15,17 @@ public class Lesson {
     @Column(name = "lesson_id")
     private Long lessonId;
 
+    @Column(name = "youtube_url")
+    private String youtubeUrl;
+
+    // геттер и сеттер
+    public String getYoutubeUrl() {
+        return youtubeUrl;
+    }
+
+    public void setYoutubeUrl(String youtubeUrl) {
+        this.youtubeUrl = youtubeUrl;
+    }
     @Column(name = "lesson_name", nullable = false)
     private String lessonName;
 

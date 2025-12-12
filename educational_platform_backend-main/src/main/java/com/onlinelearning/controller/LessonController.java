@@ -8,6 +8,7 @@ import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
 import java.util.List;
 
 @RestController
@@ -17,12 +18,15 @@ public class LessonController {
     @Autowired
     private LessonService lessonService;
 
+    // ==================== CREATE ====================
     @PostMapping("/add_lesson")
-    public ResponseEntity<Lesson> addLesson(@Valid @RequestBody LessonDTO lessonDTO) {
+    public ResponseEntity<LessonDTO> addLesson(@Valid @RequestBody LessonDTO lessonDTO) {
         Lesson lesson = lessonService.createLesson(lessonDTO);
-        return ResponseEntity.ok(lesson);
+        LessonDTO responseDTO = convertToDTO(lesson);
+        return ResponseEntity.ok(responseDTO);
     }
 
+    // ==================== READ ====================
     @GetMapping("/get_all_lessons/{courseId}")
     public ResponseEntity<List<LessonDTO>> getAllLessons(@PathVariable Long courseId) {
         List<LessonDTO> lessons = lessonService.getAllLessonsByCourse(courseId);
@@ -30,20 +34,24 @@ public class LessonController {
     }
 
     @GetMapping("/lesson_id/{lessonId}")
-    public ResponseEntity<Lesson> getLessonById(@PathVariable Long lessonId) {
+    public ResponseEntity<LessonDTO> getLessonById(@PathVariable Long lessonId) {
         Lesson lesson = lessonService.getLessonById(lessonId);
-        return ResponseEntity.ok(lesson);
+        LessonDTO dto = convertToDTO(lesson);
+        return ResponseEntity.ok(dto);
     }
 
+    // ==================== UPDATE ====================
     @PutMapping("/update/lesson_id/{lessonId}")
-    public ResponseEntity<Lesson> updateLesson(
+    public ResponseEntity<LessonDTO> updateLesson(
             @PathVariable Long lessonId,
             @Valid @RequestBody LessonDTO lessonDTO) {
 
         Lesson updatedLesson = lessonService.updateLesson(lessonId, lessonDTO);
-        return ResponseEntity.ok(updatedLesson);
+        LessonDTO responseDTO = convertToDTO(updatedLesson);
+        return ResponseEntity.ok(responseDTO);
     }
 
+    // ==================== DELETE ====================
     @DeleteMapping("/delete/lesson_id/{lessonId}/course_id/{courseId}")
     public ResponseEntity<Void> deleteLesson(
             @PathVariable Long lessonId,
@@ -53,6 +61,7 @@ public class LessonController {
         return ResponseEntity.ok().build();
     }
 
+    // ==================== STUDENT ATTENDANCE ====================
     @PostMapping("/student_enter_lesson/course_id/{courseId}/lesson_id/{lessonId}/otp/{otp}")
     public ResponseEntity<Attendance> studentEnterLesson(
             @PathVariable Long courseId,
@@ -67,5 +76,19 @@ public class LessonController {
     public ResponseEntity<List<Attendance>> getLessonAttendances(@PathVariable Long lessonId) {
         List<Attendance> attendances = lessonService.getLessonAttendances(lessonId);
         return ResponseEntity.ok(attendances);
+    }
+
+    // ==================== УТИЛИТА: конвертация Lesson → LessonDTO ====================
+    private LessonDTO convertToDTO(Lesson lesson) {
+        LessonDTO dto = new LessonDTO();
+        dto.setLessonId(lesson.getLessonId());
+        dto.setLessonName(lesson.getLessonName());
+        dto.setLessonDescription(lesson.getLessonDescription());
+        dto.setLessonOrder(lesson.getLessonOrder());
+        dto.setContent(lesson.getContent());
+        dto.setYoutubeUrl(lesson.getYoutubeUrl());  // ← Важно для видео
+        dto.setCourseId(lesson.getCourse().getCourseId());
+        dto.setCourseName(lesson.getCourse().getCourseName());
+        return dto;
     }
 }
