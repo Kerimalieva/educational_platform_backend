@@ -44,7 +44,7 @@ public class LessonService {
         lesson.setLessonDescription(lessonDTO.getLessonDescription());
         lesson.setLessonOrder(lessonDTO.getLessonOrder());
         lesson.setContent(lessonDTO.getContent());
-        lesson.setYoutubeUrl(lessonDTO.getYoutubeUrl());  // ← Добавлено
+        lesson.setYoutubeUrl(lessonDTO.getYoutubeUrl());
         lesson.setCourse(course);
         lesson.setCreatedAt(LocalDateTime.now());
         lesson.setUpdatedAt(LocalDateTime.now());
@@ -109,19 +109,56 @@ public class LessonService {
         lessonRepository.delete(lesson);
     }
 
-    // Остальные методы (studentEnterLesson, getLessonAttendances) без изменений
+    // ==================== STUDENT ATTENDANCE ====================
+    @Transactional
+    public Attendance studentEnterLesson(Long courseId, Long lessonId, String otp) {
+        UserAccount currentUser = userService.getCurrentUser();
+
+        if (!(currentUser instanceof Student)) {
+            throw new RuntimeException("Only students can enter lessons");
+        }
+
+        Student student = (Student) currentUser;
+
+        boolean isEnrolled = enrollmentRepository.existsByStudentUserAccountIdAndCourseCourseId(
+                student.getUserAccountId(), courseId);
+
+        if (!isEnrolled) {
+            throw new RuntimeException("Student is not enrolled in this course");
+        }
+
+        Lesson lesson = getLessonById(lessonId);
+
+        if (!lesson.getCourse().getCourseId().equals(courseId)) {
+            throw new RuntimeException("Lesson does not belong to the specified course");
+        }
+
+        if (!lesson.getOTP().equals(otp)) {
+            throw new RuntimeException("Invalid OTP");
+        }
+
+        attendanceRepository.findByStudentUserAccountIdAndLessonLessonId(
+                        student.getUserAccountId(), lessonId)
+                .ifPresent(attendance -> {
+                    throw new RuntimeException("Attendance already marked for this lesson");
+                });
+
+        Attendance attendance = new Attendance(student, lesson);
+        return attendanceRepository.save(attendance);
+    }
 
     public List<Attendance> getLessonAttendances(Long lessonId) {
-        // ... (без изменений)
         Lesson lesson = getLessonById(lessonId);
+
         UserAccount currentUser = userService.getCurrentUser();
         if (!lesson.getCourse().getInstructor().getUserAccountId().equals(currentUser.getUserAccountId())) {
             throw new RuntimeException("Only course instructor can view attendances");
         }
+
         return attendanceRepository.findByLessonLessonId(lessonId);
     }
 
-    // Обновлённый конвертер в DTO
+    // ==================== DTO CONVERTER ====================
     private LessonDTO convertToDTO(Lesson lesson) {
         LessonDTO dto = new LessonDTO();
         dto.setLessonId(lesson.getLessonId());
@@ -129,7 +166,7 @@ public class LessonService {
         dto.setLessonDescription(lesson.getLessonDescription());
         dto.setLessonOrder(lesson.getLessonOrder());
         dto.setContent(lesson.getContent());
-        dto.setYoutubeUrl(lesson.getYoutubeUrl());  // ← Добавлено
+        dto.setYoutubeUrl(lesson.getYoutubeUrl());
         dto.setCourseId(lesson.getCourse().getCourseId());
         dto.setCourseName(lesson.getCourse().getCourseName());
         return dto;
