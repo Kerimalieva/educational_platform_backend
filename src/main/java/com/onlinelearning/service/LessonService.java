@@ -172,6 +172,7 @@ public class LessonService {
         dto.setContent(lesson.getContent());
         dto.setCourseId(lesson.getCourse().getCourseId());
         dto.setCourseName(lesson.getCourse().getCourseName());
+        dto.setOtp(lesson.getOTP());
         return dto;
     }
 }

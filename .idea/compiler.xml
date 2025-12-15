@@ -7,11 +7,11 @@
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
         <module name="online-learning-platform (2)" />
-        <module name="online-learning-platform (1)" />
       </profile>
     </annotationProcessing>
     <bytecodeTargetLevel>
       <module name="online-learning-platform" target="21" />
+      <module name="online-learning-platform (1)" target="21" />
     </bytecodeTargetLevel>
   </component>
   <component name="JavacSettings">

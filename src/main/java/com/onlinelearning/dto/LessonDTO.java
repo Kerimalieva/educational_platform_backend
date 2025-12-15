@@ -9,6 +9,8 @@ public class LessonDTO {
     private String content;
     private Long courseId;
     private String courseName;
+    private String otp;
+
 
     // Getters and Setters
     public Long getLessonId() {
@@ -65,5 +67,13 @@ public class LessonDTO {
 
     public void setCourseName(String courseName) {
         this.courseName = courseName;
+    }
+
+    public String getOtp() {
+        return otp;
+    }
+
+    public void setOtp(String otp) {
+        this.otp = otp;
     }
 }
