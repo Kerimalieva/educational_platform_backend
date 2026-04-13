@@ -8,6 +8,6 @@ import java.util.Optional;
 
 @Repository
 public interface AssignmentSubmissionRepository extends JpaRepository<AssignmentSubmission, Long> {
-    List<AssignmentSubmission> findByAssignmentAssignmentId(Long assignmentId);
     Optional<AssignmentSubmission> findByStudentUserAccountIdAndAssignmentAssignmentId(Long studentId, Long assignmentId);
+    List<AssignmentSubmission> findByAssignmentAssignmentId(Long assignmentId);
 }

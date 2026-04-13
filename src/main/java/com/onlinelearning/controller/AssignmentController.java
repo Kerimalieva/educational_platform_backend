@@ -5,12 +5,14 @@ import com.onlinelearning.entity.Assignment;
 import com.onlinelearning.entity.AssignmentSubmission;
 import com.onlinelearning.service.AssignmentService;
 import jakarta.validation.Valid;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Map;
 
+@Slf4j
 @RestController
 @RequestMapping("/assignment")
 public class AssignmentController {
@@ -25,40 +27,31 @@ public class AssignmentController {
     }
 
     @PostMapping("/uploadAssignment")
-    public ResponseEntity<AssignmentSubmission> uploadAssignment(
-            @Valid @RequestBody AssignmentSubmission submission) {
-
+    public ResponseEntity<AssignmentSubmission> uploadAssignment(@Valid @RequestBody AssignmentSubmission submission) {
         AssignmentSubmission savedSubmission = assignmentService.uploadAssignment(submission);
         return ResponseEntity.ok(savedSubmission);
     }
 
     @PutMapping("/gradeAssignment")
-    public ResponseEntity<AssignmentSubmission> gradeAssignment(
-            @RequestBody Map<String, Object> request) {
-
+    public ResponseEntity<AssignmentSubmission> gradeAssignment(@RequestBody Map<String, Object> request) {
         Long studentId = Long.valueOf(request.get("studentId").toString());
         Long assignmentId = Long.valueOf(request.get("assignmentId").toString());
         Double grade = Double.valueOf(request.get("grade").toString());
-
         AssignmentSubmission graded = assignmentService.gradeAssignment(studentId, assignmentId, grade);
         return ResponseEntity.ok(graded);
     }
 
     @PutMapping("/saveAssignmentFeedback")
-    public ResponseEntity<AssignmentSubmission> saveAssignmentFeedback(
-            @RequestBody Map<String, Object> request) {
-
+    public ResponseEntity<AssignmentSubmission> saveAssignmentFeedback(@RequestBody Map<String, Object> request) {
         Long studentId = Long.valueOf(request.get("studentId").toString());
         Long assignmentId = Long.valueOf(request.get("assignmentId").toString());
         String feedback = request.get("feedback").toString();
-
         AssignmentSubmission updated = assignmentService.saveAssignmentFeedback(studentId, assignmentId, feedback);
         return ResponseEntity.ok(updated);
     }
 
     @GetMapping("/getFeedback")
-    public ResponseEntity<String> getFeedback(@RequestBody Map<String, Object> request) {
-        Long assignmentId = Long.valueOf(request.get("assignmentId").toString());
+    public ResponseEntity<String> getFeedback(@RequestParam Long assignmentId) {
         String feedback = assignmentService.getFeedback(assignmentId);
         return ResponseEntity.ok(feedback);
     }
@@ -67,5 +60,28 @@ public class AssignmentController {
     public ResponseEntity<List<AssignmentSubmission>> getSubmissions(@PathVariable Long assignmentId) {
         List<AssignmentSubmission> submissions = assignmentService.getSubmissions(assignmentId);
         return ResponseEntity.ok(submissions);
+    }
+
+    @GetMapping("/course/{courseId}")
+    public ResponseEntity<List<AssignmentDTO>> getAssignmentsByCourse(@PathVariable Long courseId) {
+        List<AssignmentDTO> assignments = assignmentService.getAssignmentsByCourse(courseId);
+        return ResponseEntity.ok(assignments);
+    }
+
+    @GetMapping("/submission/student/{studentId}/assignment/{assignmentId}")
+    public ResponseEntity<AssignmentSubmission> getSubmissionByStudentAndAssignment(
+            @PathVariable Long studentId,
+            @PathVariable Long assignmentId) {
+        AssignmentSubmission submission = assignmentService.findSubmissionByStudentAndAssignment(studentId, assignmentId);
+        if (submission == null) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(submission);
+    }
+
+    @DeleteMapping("/{assignmentId}")
+    public ResponseEntity<?> deleteAssignment(@PathVariable Long assignmentId) {
+        assignmentService.deleteAssignment(assignmentId);
+        return ResponseEntity.ok().build();
     }
 }

@@ -1,7 +1,6 @@
 package com.onlinelearning.service;
 
-import com.onlinelearning.dto.AuthRequest;
-import com.onlinelearning.dto.AuthResponse;
+import com.onlinelearning.dto.*;
 import com.onlinelearning.entity.*;
 import com.onlinelearning.repository.*;
 import com.onlinelearning.security.JwtUtil;
@@ -13,7 +12,6 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import java.util.Optional;
 
 @Service
 public class AuthService {
@@ -39,114 +37,60 @@ public class AuthService {
     @Autowired
     private UserTypeRepository userTypeRepository;
 
-//    @Transactional
-//    public AuthResponse register(AuthRequest authRequest) {
-//        // Check if user already exists
-//        if (userAccountRepository.existsByEmail(authRequest.getEmail())) {
-//            throw new RuntimeException("Email already exists");
-//        }
-//
-//        // Get user type
-//        UserType userType = userTypeRepository.findById(authRequest.getUserTypeId())
-//                .orElseThrow(() -> new RuntimeException("Invalid user type"));
-//
-//        // Create user based on type
-//        UserAccount userAccount;
-//        String encodedPassword = passwordEncoder.encode(authRequest.getPassword());
-//
-//        if (userType.getTypeName().equals("STUDENT")) {
-//            Student student = new Student();
-//            student.setEmail(authRequest.getEmail());
-//            student.setPassword(encodedPassword);
-//            student.setUserType(userType);
-//            userAccount = studentRepository.save(student);
-//        } else if (userType.getTypeName().equals("INSTRUCTOR")) {
-//            Instructor instructor = new Instructor();
-//            instructor.setEmail(authRequest.getEmail());
-//            instructor.setPassword(encodedPassword);
-//            instructor.setUserType(userType);
-//            userAccount = instructorRepository.save(instructor);
-//        } else {
-//            UserAccount newUser = new UserAccount();
-//            newUser.setEmail(authRequest.getEmail());
-//            newUser.setPassword(encodedPassword);
-//            newUser.setUserType(userType);
-//            userAccount = userAccountRepository.save(newUser);
-//        }
-//
-//        // Authenticate the user
-//        Authentication authentication = authenticationManager.authenticate(
-//                new UsernamePasswordAuthenticationToken(authRequest.getEmail(), authRequest.getPassword())
-//        );
-//
-//        SecurityContextHolder.getContext().setAuthentication(authentication);
-//        String jwt = jwtUtil.generateToken(
-//                (org.springframework.security.core.userdetails.User) authentication.getPrincipal()
-//        );
-//
-//        // Create response
-//        AuthResponse response = new AuthResponse();
-//        response.setToken(jwt);
-//        response.setEmail(userAccount.getEmail());
-//        response.setFirstName(userAccount.getFirstName());
-//        response.setLastName(userAccount.getLastName());
-//        response.setUserId(userAccount.getUserAccountId());
-//        response.setUserType(userType.getTypeName());
-//
-//        return response;
-//    }
-
+    // ====================== REGISTER ======================
     @Transactional
-    public AuthResponse register(AuthRequest authRequest) {
-        // Check if user already exists
-        if (userAccountRepository.existsByEmail(authRequest.getEmail())) {
+    public AuthResponse register(SignupRequest signupRequest) {
+        // Проверяем, существует ли пользователь
+        if (userAccountRepository.existsByEmail(signupRequest.getEmail())) {
             throw new RuntimeException("Email already exists");
         }
 
-        // Get user type by role name
-        String roleName = authRequest.getRole().toUpperCase(); // "student" -> "STUDENT"
+        // Получаем userType по имени роли ("STUDENT" / "INSTRUCTOR")
+        String roleName = signupRequest.getRole().toUpperCase();
         UserType userType = userTypeRepository.findByTypeName(roleName)
-                .orElseThrow(() -> new RuntimeException("Invalid user type"));
+                .orElseThrow(() -> new RuntimeException("Invalid user type: " + roleName));
 
-        // Create user based on type
+        // Шифруем пароль
+        String encodedPassword = passwordEncoder.encode(signupRequest.getPassword());
         UserAccount userAccount;
-        String encodedPassword = passwordEncoder.encode(authRequest.getPassword());
 
+        // Создание пользователя по типу
         switch (roleName) {
             case "STUDENT":
                 Student student = new Student();
-                student.setEmail(authRequest.getEmail());
+                student.setEmail(signupRequest.getEmail());
                 student.setPassword(encodedPassword);
                 student.setUserType(userType);
                 userAccount = studentRepository.save(student);
                 break;
             case "INSTRUCTOR":
                 Instructor instructor = new Instructor();
-                instructor.setEmail(authRequest.getEmail());
+                instructor.setEmail(signupRequest.getEmail());
                 instructor.setPassword(encodedPassword);
                 instructor.setUserType(userType);
                 userAccount = instructorRepository.save(instructor);
                 break;
             default:
                 UserAccount newUser = new UserAccount();
-                newUser.setEmail(authRequest.getEmail());
+                newUser.setEmail(signupRequest.getEmail());
                 newUser.setPassword(encodedPassword);
                 newUser.setUserType(userType);
                 userAccount = userAccountRepository.save(newUser);
                 break;
         }
 
-        // Authenticate the user and generate JWT
+        // Аутентифицируем пользователя, чтобы сразу выдать JWT
         Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(authRequest.getEmail(), authRequest.getPassword())
+                new UsernamePasswordAuthenticationToken(signupRequest.getEmail(), signupRequest.getPassword())
         );
-
         SecurityContextHolder.getContext().setAuthentication(authentication);
+
+        // Генерируем JWT-токен
         String jwt = jwtUtil.generateToken(
                 (org.springframework.security.core.userdetails.User) authentication.getPrincipal()
         );
 
-        // Create response
+        // Формируем ответ
         AuthResponse response = new AuthResponse();
         response.setToken(jwt);
         response.setEmail(userAccount.getEmail());
@@ -158,22 +102,24 @@ public class AuthService {
         return response;
     }
 
-
-    public AuthResponse login(AuthRequest authRequest) {
+    // ====================== LOGIN (без роли) ======================
+    public AuthResponse login(LoginRequest loginRequest) {
+        // Проверяем email/пароль
         Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(authRequest.getEmail(), authRequest.getPassword())
+                new UsernamePasswordAuthenticationToken(loginRequest.getEmail(), loginRequest.getPassword())
         );
-
         SecurityContextHolder.getContext().setAuthentication(authentication);
+
+        // Генерация JWT
         String jwt = jwtUtil.generateToken(
                 (org.springframework.security.core.userdetails.User) authentication.getPrincipal()
         );
 
-        // Get user details
-        UserAccount userAccount = userAccountRepository.findByEmail(authRequest.getEmail())
+        // Получаем данные учетной записи
+        UserAccount userAccount = userAccountRepository.findByEmail(loginRequest.getEmail())
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        // Create response
+        // Формируем AuthResponse
         AuthResponse response = new AuthResponse();
         response.setToken(jwt);
         response.setEmail(userAccount.getEmail());
@@ -185,6 +131,7 @@ public class AuthService {
         return response;
     }
 
+    // ====================== LOGOUT ======================
     public void logout() {
         SecurityContextHolder.clearContext();
     }
