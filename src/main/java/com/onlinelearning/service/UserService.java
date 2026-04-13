@@ -48,7 +48,6 @@ public class UserService {
         return userAccountRepository.save(userAccount);
     }
 
-    // Новый метод для преобразования в DTO
     public UserProfileResponse convertToProfileResponse(UserAccount userAccount) {
         UserProfileResponse response = new UserProfileResponse();
         response.setUserAccountId(userAccount.getUserAccountId());
