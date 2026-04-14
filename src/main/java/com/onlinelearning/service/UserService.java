@@ -39,14 +39,19 @@ public class UserService {
     @Transactional
     public UserProfileResponse updateUserProfile(Long userId, UserUpdateRequest updateRequest) {
         log.info("Updating profile for user id: {}", userId);
+
         UserAccount userAccount = userAccountRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User", userId));
 
-        if (updateRequest.getFirstName() != null) {
-            userAccount.setFirstName(updateRequest.getFirstName());
-        }
-        if (updateRequest.getLastName() != null) {
-            userAccount.setLastName(updateRequest.getLastName());
+        if (updateRequest != null) {
+            if (updateRequest.getFirstName() != null) {
+                userAccount.setFirstName(updateRequest.getFirstName());
+            }
+            if (updateRequest.getLastName() != null) {
+                userAccount.setLastName(updateRequest.getLastName());
+            }
+        } else {
+            log.debug("Update request is null, no changes applied");
         }
 
         userAccount.setUpdatedAt(LocalDateTime.now());
