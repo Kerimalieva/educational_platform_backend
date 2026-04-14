@@ -3,12 +3,15 @@ package com.onlinelearning.util;
 import com.onlinelearning.dto.request.SignupRequest;
 import com.onlinelearning.dto.response.AuthResponse;
 import com.onlinelearning.dto.response.UserProfileResponse;
-import com.onlinelearning.entity.Instructor;
-import com.onlinelearning.entity.UserAccount;
-import com.onlinelearning.entity.UserType;
+import com.onlinelearning.entity.*;
 import com.onlinelearning.dto.request.CourseRequest;
 import com.onlinelearning.dto.response.CourseResponse;
-import com.onlinelearning.entity.Course;
+import com.onlinelearning.dto.request.LessonRequest;
+import com.onlinelearning.dto.response.LessonResponse;
+import com.onlinelearning.dto.response.AttendanceResponse;
+import com.onlinelearning.dto.response.EnrollmentResponse;
+import com.onlinelearning.dto.response.NotificationResponse;
+
 
 
 
@@ -70,6 +73,78 @@ public final class ConvertHelper {
         course.setDuration(request.getDuration());
         course.setInstructor(instructor);
         return course;
+    }
+
+
+
+    public static LessonResponse toLessonResponse(Lesson lesson) {
+        if (lesson == null) return null;
+        return LessonResponse.builder()
+                .lessonId(lesson.getLessonId())
+                .lessonName(lesson.getLessonName())
+                .lessonDescription(lesson.getLessonDescription())
+                .lessonOrder(lesson.getLessonOrder())
+                .content(lesson.getContent())
+                .otp(lesson.getOTP())
+                .courseId(lesson.getCourse().getCourseId())
+                .courseName(lesson.getCourse().getCourseName())
+                .createdAt(lesson.getCreatedAt())
+                .updatedAt(lesson.getUpdatedAt())
+                .build();
+    }
+
+    public static Lesson toLesson(LessonRequest request, Course course) {
+        if (request == null) return null;
+        Lesson lesson = new Lesson();
+        lesson.setLessonName(request.getLessonName());
+        lesson.setLessonDescription(request.getLessonDescription());
+        lesson.setLessonOrder(request.getLessonOrder());
+        lesson.setContent(request.getContent());
+        lesson.setCourse(course);
+        return lesson;
+    }
+
+    public static AttendanceResponse toAttendanceResponse(Attendance attendance) {
+        if (attendance == null) return null;
+        return AttendanceResponse.builder()
+                .attendanceId(attendance.getAttendanceId())
+                .studentId(attendance.getStudent().getUserAccountId())
+                .studentName(attendance.getStudent().getFirstName() + " " + attendance.getStudent().getLastName())
+                .lessonId(attendance.getLesson().getLessonId())
+                .lessonName(attendance.getLesson().getLessonName())
+                .attendedAt(attendance.getAttendedAt())
+                .build();
+    }
+
+
+    public static EnrollmentResponse toEnrollmentResponse(Enrollment enrollment) {
+        if (enrollment == null) return null;
+        return EnrollmentResponse.builder()
+                .enrollmentId(enrollment.getEnrollmentId())
+                .studentId(enrollment.getStudent().getUserAccountId())
+                .studentName(enrollment.getStudent().getFirstName() + " " + enrollment.getStudent().getLastName())
+                .studentEmail(enrollment.getStudent().getEmail())
+                .courseId(enrollment.getCourse().getCourseId())
+                .courseName(enrollment.getCourse().getCourseName())
+                .enrolledAt(enrollment.getEnrolledAt())
+                .build();
+    }
+
+    public static Enrollment toEnrollment(Student student, Course course) {
+        return new Enrollment(student, course);
+    }
+
+    public static NotificationResponse toNotificationResponse(Notification notification) {
+        if (notification == null) return null;
+        return NotificationResponse.builder()
+                .notificationId(notification.getNotificationId())
+                .message(notification.getMessage())
+                .isRead(notification.getIsRead())
+                .createdAt(notification.getCreatedAt())
+                .notificationType(notification.getNotificationType())
+                .referenceId(notification.getReferenceId())
+                .userId(notification.getUser().getUserAccountId())
+                .build();
     }
 
 }

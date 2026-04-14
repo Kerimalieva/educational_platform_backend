@@ -1,178 +1,188 @@
 package com.onlinelearning.service;
 
-import com.onlinelearning.dto.LessonDTO;
+import com.onlinelearning.dto.request.*;
+import com.onlinelearning.dto.response.*;
 import com.onlinelearning.entity.*;
+import com.onlinelearning.exception.AccessDeniedException;
+import com.onlinelearning.exception.BusinessException;
+import com.onlinelearning.exception.ResourceNotFoundException;
 import com.onlinelearning.repository.*;
-import org.springframework.beans.factory.annotation.Autowired;
+import com.onlinelearning.util.ConvertHelper;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
+@RequiredArgsConstructor
 public class LessonService {
 
-    @Autowired
-    private LessonRepository lessonRepository;
-
-    @Autowired
-    private CourseRepository courseRepository;
-
-    @Autowired
-    private AttendanceRepository attendanceRepository;
-
-    @Autowired
-    private UserService userService;
-
-    @Autowired
-    private EnrollmentRepository enrollmentRepository;
+    private final LessonRepository lessonRepository;
+    private final CourseRepository courseRepository;
+    private final AttendanceRepository attendanceRepository;
+    private final UserService userService;
+    private final EnrollmentRepository enrollmentRepository;
 
     @Transactional
-    public Lesson createLesson(LessonDTO lessonDTO) {
-        Course course = courseRepository.findById(lessonDTO.getCourseId())
-                .orElseThrow(() -> new RuntimeException("Course not found"));
+    public LessonResponse createLesson(LessonRequest request) {
+        log.info("Creating lesson: {} for courseId: {}", request.getLessonName(), request.getCourseId());
 
-        // Check if current user is the course instructor
+        Course course = courseRepository.findById(request.getCourseId())
+                .orElseThrow(() -> new ResourceNotFoundException("Course", request.getCourseId()));
+
         UserAccount currentUser = userService.getCurrentUser();
         if (!course.getInstructor().getUserAccountId().equals(currentUser.getUserAccountId())) {
-            throw new RuntimeException("Only course instructor can create lessons");
+            throw new AccessDeniedException("Only course instructor can create lessons");
         }
 
-        Lesson lesson = new Lesson();
-        lesson.setLessonName(lessonDTO.getLessonName());
-        lesson.setLessonDescription(lessonDTO.getLessonDescription());
-        lesson.setLessonOrder(lessonDTO.getLessonOrder());
-        lesson.setContent(lessonDTO.getContent());
-        lesson.setCourse(course);
-
-        return lessonRepository.save(lesson);
+        Lesson lesson = ConvertHelper.toLesson(request, course);
+        Lesson saved = lessonRepository.save(lesson);
+        log.info("Lesson created with id: {}", saved.getLessonId());
+        return ConvertHelper.toLessonResponse(saved);
     }
 
-    public List<LessonDTO> getAllLessonsByCourse(Long courseId) {
-        return lessonRepository.findByCourseCourseIdOrderByLessonOrderAsc(courseId).stream()
-                .map(this::convertToDTO)
-                .collect(Collectors.toList());
+    @Transactional(readOnly = true)
+    public Page<LessonResponse> getLessonsByCourse(Long courseId, Pageable pageable) {
+        log.debug("Fetching lessons for courseId: {}, page: {}", courseId, pageable.getPageNumber());
+        Course course = courseRepository.findById(courseId)
+                .orElseThrow(() -> new ResourceNotFoundException("Course", courseId));
+
+        UserAccount currentUser = userService.getCurrentUser();
+        boolean isInstructor = course.getInstructor().getUserAccountId().equals(currentUser.getUserAccountId());
+        boolean isEnrolledStudent = false;
+
+        if (currentUser instanceof Student) {
+            isEnrolledStudent = enrollmentRepository.existsByStudentUserAccountIdAndCourseCourseId(
+                    currentUser.getUserAccountId(), courseId);
+        }
+
+        if (!isInstructor && !isEnrolledStudent) {
+            throw new AccessDeniedException("You are not enrolled in this course or not the instructor");
+        }
+
+        return lessonRepository.findByCourseCourseIdOrderByLessonOrderAsc(courseId, pageable)
+                .map(ConvertHelper::toLessonResponse);
     }
 
-    public Lesson getLessonById(Long lessonId) {
-        return lessonRepository.findById(lessonId)
-                .orElseThrow(() -> new RuntimeException("Lesson not found"));
+    @Transactional(readOnly = true)
+    public LessonResponse getLessonById(Long lessonId) {
+        log.debug("Fetching lesson by id: {}", lessonId);
+        Lesson lesson = lessonRepository.findById(lessonId)
+                .orElseThrow(() -> new ResourceNotFoundException("Lesson", lessonId));
+        return ConvertHelper.toLessonResponse(lesson);
     }
 
     @Transactional
-    public Lesson updateLesson(Long lessonId, LessonDTO lessonDTO) {
-        Lesson lesson = getLessonById(lessonId);
+    public LessonResponse updateLesson(Long lessonId, LessonRequest request) {
+        log.info("Updating lesson id: {}", lessonId);
+        Lesson lesson = lessonRepository.findById(lessonId)
+                .orElseThrow(() -> new ResourceNotFoundException("Lesson", lessonId));
 
-        // Check if current user is the course instructor
         UserAccount currentUser = userService.getCurrentUser();
         if (!lesson.getCourse().getInstructor().getUserAccountId().equals(currentUser.getUserAccountId())) {
-            throw new RuntimeException("Only course instructor can update lessons");
+            throw new AccessDeniedException("Only course instructor can update lessons");
         }
 
-        if (lessonDTO.getLessonName() != null) {
-            lesson.setLessonName(lessonDTO.getLessonName());
-        }
+        if (request.getLessonName() != null) lesson.setLessonName(request.getLessonName());
+        if (request.getLessonDescription() != null) lesson.setLessonDescription(request.getLessonDescription());
+        if (request.getLessonOrder() != null) lesson.setLessonOrder(request.getLessonOrder());
+        if (request.getContent() != null) lesson.setContent(request.getContent());
+        lesson.setUpdatedAt(LocalDateTime.now());
 
-        if (lessonDTO.getLessonDescription() != null) {
-            lesson.setLessonDescription(lessonDTO.getLessonDescription());
-        }
-
-        if (lessonDTO.getLessonOrder() != null) {
-            lesson.setLessonOrder(lessonDTO.getLessonOrder());
-        }
-
-        if (lessonDTO.getContent() != null) {
-            lesson.setContent(lessonDTO.getContent());
-        }
-
-        lesson.setUpdatedAt(java.time.LocalDateTime.now());
-
-        return lessonRepository.save(lesson);
+        Lesson updated = lessonRepository.save(lesson);
+        log.info("Lesson updated: {}", updated.getLessonId());
+        return ConvertHelper.toLessonResponse(updated);
     }
 
     @Transactional
-    public void deleteLesson(Long lessonId, Long courseId) {
-        Lesson lesson = getLessonById(lessonId);
+    public void deleteLesson(Long lessonId) {
+        log.info("Deleting lesson id: {}", lessonId);
+        Lesson lesson = lessonRepository.findById(lessonId)
+                .orElseThrow(() -> new ResourceNotFoundException("Lesson", lessonId));
 
-        // Verify the lesson belongs to the specified course
-        if (!lesson.getCourse().getCourseId().equals(courseId)) {
-            throw new RuntimeException("Lesson does not belong to the specified course");
-        }
-
-        // Check if current user is the course instructor
         UserAccount currentUser = userService.getCurrentUser();
         if (!lesson.getCourse().getInstructor().getUserAccountId().equals(currentUser.getUserAccountId())) {
-            throw new RuntimeException("Only course instructor can delete lessons");
+            throw new AccessDeniedException("Only course instructor can delete lessons");
         }
 
         lessonRepository.delete(lesson);
+        log.info("Lesson deleted: {}", lessonId);
     }
 
     @Transactional
-    public Attendance studentEnterLesson(Long courseId, Long lessonId, String otp) {
+    public AttendanceResponse studentEnterLesson(Long courseId, Long lessonId, String otp) {
+        log.info("Student entering lesson: courseId={}, lessonId={}", courseId, lessonId);
         UserAccount currentUser = userService.getCurrentUser();
 
-        // Check if user is a student
         if (!(currentUser instanceof Student)) {
-            throw new RuntimeException("Only students can enter lessons");
+            throw new AccessDeniedException("Only students can enter lessons");
         }
-
         Student student = (Student) currentUser;
 
-        // Check if student is enrolled in the course
         boolean isEnrolled = enrollmentRepository.existsByStudentUserAccountIdAndCourseCourseId(
                 student.getUserAccountId(), courseId);
-
         if (!isEnrolled) {
-            throw new RuntimeException("Student is not enrolled in this course");
+            throw new AccessDeniedException("Student is not enrolled in this course");
         }
 
-        Lesson lesson = getLessonById(lessonId);
+        Lesson lesson = lessonRepository.findById(lessonId)
+                .orElseThrow(() -> new ResourceNotFoundException("Lesson", lessonId));
 
-        // Verify the lesson belongs to the specified course
         if (!lesson.getCourse().getCourseId().equals(courseId)) {
-            throw new RuntimeException("Lesson does not belong to the specified course");
+            throw new BusinessException("Lesson does not belong to the specified course", "INVALID_MAPPING");
         }
 
-        // Check OTP
         if (!lesson.getOTP().equals(otp)) {
-            throw new RuntimeException("Invalid OTP");
+            throw new BusinessException("Invalid OTP", "INVALID_OTP");
         }
 
-        // Check if attendance already exists
-        attendanceRepository.findByStudentUserAccountIdAndLessonLessonId(
-                        student.getUserAccountId(), lessonId)
-                .ifPresent(attendance -> {
-                    throw new RuntimeException("Attendance already marked for this lesson");
-                });
+        if (attendanceRepository.findByStudentUserAccountIdAndLessonLessonId(student.getUserAccountId(), lessonId).isPresent()) {
+            throw new BusinessException("Attendance already marked for this lesson", "DUPLICATE_ATTENDANCE");
+        }
 
-        // Create attendance
         Attendance attendance = new Attendance(student, lesson);
-        return attendanceRepository.save(attendance);
+        Attendance saved = attendanceRepository.save(attendance);
+        log.info("Attendance marked: studentId={}, lessonId={}", student.getUserAccountId(), lessonId);
+        return ConvertHelper.toAttendanceResponse(saved);
     }
 
-    public List<Attendance> getLessonAttendances(Long lessonId) {
-        Lesson lesson = getLessonById(lessonId);
+    @Transactional(readOnly = true)
+    public List<AttendanceResponse> getLessonAttendances(Long lessonId) {
+        log.debug("Fetching attendances for lessonId: {}", lessonId);
+        Lesson lesson = lessonRepository.findById(lessonId)
+                .orElseThrow(() -> new ResourceNotFoundException("Lesson", lessonId));
 
-        // Check if current user is the course instructor
         UserAccount currentUser = userService.getCurrentUser();
         if (!lesson.getCourse().getInstructor().getUserAccountId().equals(currentUser.getUserAccountId())) {
-            throw new RuntimeException("Only course instructor can view attendances");
+            throw new AccessDeniedException("Only course instructor can view attendances");
         }
 
-        return attendanceRepository.findByLessonLessonId(lessonId);
+        return attendanceRepository.findByLessonLessonId(lessonId).stream()
+                .map(ConvertHelper::toAttendanceResponse)
+                .collect(Collectors.toList());
     }
 
-    private LessonDTO convertToDTO(Lesson lesson) {
-        LessonDTO dto = new LessonDTO();
-        dto.setLessonId(lesson.getLessonId());
-        dto.setLessonName(lesson.getLessonName());
-        dto.setLessonDescription(lesson.getLessonDescription());
-        dto.setLessonOrder(lesson.getLessonOrder());
-        dto.setContent(lesson.getContent());
-        dto.setCourseId(lesson.getCourse().getCourseId());
-        dto.setCourseName(lesson.getCourse().getCourseName());
-        dto.setOtp(lesson.getOTP());
-        return dto;
+    @Transactional
+    public String regenerateOtp(Long lessonId) {
+        log.info("Regenerating OTP for lesson id: {}", lessonId);
+        Lesson lesson = lessonRepository.findById(lessonId)
+                .orElseThrow(() -> new ResourceNotFoundException("Lesson", lessonId));
+
+        UserAccount currentUser = userService.getCurrentUser();
+        if (!lesson.getCourse().getInstructor().getUserAccountId().equals(currentUser.getUserAccountId())) {
+            throw new AccessDeniedException("Only course instructor can regenerate OTP");
+        }
+
+        lesson.regenerateOTP();
+        Lesson updated = lessonRepository.save(lesson);
+        log.info("OTP regenerated for lesson: {}", lessonId);
+        return updated.getOTP();
     }
 }
