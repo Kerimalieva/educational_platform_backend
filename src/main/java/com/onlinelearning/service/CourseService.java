@@ -1,162 +1,110 @@
 package com.onlinelearning.service;
 
-import com.onlinelearning.dto.CourseDTO;
+import com.onlinelearning.dto.request.CourseRequest;
+import com.onlinelearning.dto.response.CourseResponse;
 import com.onlinelearning.entity.Course;
 import com.onlinelearning.entity.Instructor;
-import com.onlinelearning.entity.Media;
 import com.onlinelearning.entity.UserAccount;
+import com.onlinelearning.exception.AccessDeniedException;
+import com.onlinelearning.exception.ResourceNotFoundException;
 import com.onlinelearning.repository.CourseRepository;
-import com.onlinelearning.repository.InstructorRepository;
-import com.onlinelearning.repository.MediaRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import com.onlinelearning.util.ConvertHelper;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.multipart.MultipartFile;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.List;
-import java.util.stream.Collectors;
 
+@Slf4j
 @Service
+@RequiredArgsConstructor
 public class CourseService {
 
-    @Autowired
-    private CourseRepository courseRepository;
-
-    @Autowired
-    private InstructorRepository instructorRepository;
-
-    @Autowired
-    private MediaRepository mediaRepository;
-
-    @Autowired
-    private UserService userService;
-
-    private final Path fileStorageLocation = Paths.get("uploads").toAbsolutePath().normalize();
-
-    public CourseService() {
-        try {
-            Files.createDirectories(this.fileStorageLocation);
-        } catch (IOException ex) {
-            throw new RuntimeException("Could not create the directory where the uploaded files will be stored.", ex);
-        }
-    }
+    private final CourseRepository courseRepository;
+    private final UserService userService;
 
     @Transactional
-    public Course createCourse(CourseDTO courseDTO) {
+    public CourseResponse createCourse(CourseRequest request) {
+        log.info("Creating course: {}", request.getCourseName());
         UserAccount currentUser = userService.getCurrentUser();
-
-        // Check if user is instructor
         if (!(currentUser instanceof Instructor)) {
-            throw new RuntimeException("Only instructors can create courses");
+            throw new AccessDeniedException("Only instructors can create courses");
         }
-
         Instructor instructor = (Instructor) currentUser;
 
-        Course course = new Course();
-        course.setCourseName(courseDTO.getCourseName());
-        course.setDescription(courseDTO.getDescription());
-        course.setDuration(courseDTO.getDuration());
-        course.setInstructor(instructor);
-
-        return courseRepository.save(course);
+        Course course = ConvertHelper.toCourse(request, instructor);
+        Course saved = courseRepository.save(course);
+        log.info("Course created with id: {}", saved.getCourseId());
+        return ConvertHelper.toCourseResponse(saved);
     }
 
-    public Course getCourseById(Long id) {
-        return courseRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Course not found"));
+    @Transactional(readOnly = true)
+    public CourseResponse getCourseById(Long id) {
+        log.debug("Fetching course by id: {}", id);
+        Course course = courseRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Course", id));
+        return ConvertHelper.toCourseResponse(course);
     }
 
-    public List<CourseDTO> getAllCourses() {
-        return courseRepository.findAll().stream()
-                .map(this::convertToDTO)
-                .collect(Collectors.toList());
+    @Transactional(readOnly = true)
+    public Page<CourseResponse> getAllCourses(Pageable pageable) {
+        log.debug("Fetching all courses with pagination: page={}, size={}", pageable.getPageNumber(), pageable.getPageSize());
+        return courseRepository.findAll(pageable)
+                .map(ConvertHelper::toCourseResponse);
     }
 
-    public List<CourseDTO> getCoursesByInstructor(Long instructorId) {
-        return courseRepository.findByInstructorUserAccountId(instructorId).stream()
-                .map(this::convertToDTO)
-                .collect(Collectors.toList());
+    @Transactional(readOnly = true)
+    public Page<CourseResponse> getMyCourses(Pageable pageable) {
+        UserAccount currentUser = userService.getCurrentUser();
+        if (!(currentUser instanceof Instructor)) {
+            throw new AccessDeniedException("Only instructors can view their own courses");
+        }
+        Long instructorId = currentUser.getUserAccountId();
+        log.debug("Fetching courses for instructor id: {}", instructorId);
+        return courseRepository.findByInstructorUserAccountId(instructorId, pageable)
+                .map(ConvertHelper::toCourseResponse);
     }
 
     @Transactional
-    public Course updateCourse(Long courseId, CourseDTO courseDTO) {
-        Course course = getCourseById(courseId);
+    public CourseResponse updateCourse(Long courseId, CourseRequest request) {
+        log.info("Updating course id: {}", courseId);
+        Course course = courseRepository.findById(courseId)
+                .orElseThrow(() -> new ResourceNotFoundException("Course", courseId));
 
-        // Check if current user is the course instructor
         UserAccount currentUser = userService.getCurrentUser();
         if (!course.getInstructor().getUserAccountId().equals(currentUser.getUserAccountId())) {
-            throw new RuntimeException("Only course instructor can update the course");
+            throw new AccessDeniedException("Only course instructor can update the course");
         }
 
-        if (courseDTO.getCourseName() != null) {
-            course.setCourseName(courseDTO.getCourseName());
+        if (request.getCourseName() != null) {
+            course.setCourseName(request.getCourseName());
         }
-
-        if (courseDTO.getDescription() != null) {
-            course.setDescription(courseDTO.getDescription());
+        if (request.getDescription() != null) {
+            course.setDescription(request.getDescription());
         }
-
-        if (courseDTO.getDuration() != null) {
-            course.setDuration(courseDTO.getDuration());
+        if (request.getDuration() != null) {
+            course.setDuration(request.getDuration());
         }
-
         course.setUpdatedAt(java.time.LocalDateTime.now());
 
-        return courseRepository.save(course);
+        Course updated = courseRepository.save(course);
+        log.info("Course updated: {}", updated.getCourseId());
+        return ConvertHelper.toCourseResponse(updated);
     }
 
     @Transactional
     public void deleteCourse(Long courseId) {
-        Course course = getCourseById(courseId);
+        log.info("Deleting course id: {}", courseId);
+        Course course = courseRepository.findById(courseId)
+                .orElseThrow(() -> new ResourceNotFoundException("Course", courseId));
 
-        // Check if current user is the course instructor
         UserAccount currentUser = userService.getCurrentUser();
         if (!course.getInstructor().getUserAccountId().equals(currentUser.getUserAccountId())) {
-            throw new RuntimeException("Only course instructor can delete the course");
+            throw new AccessDeniedException("Only course instructor can delete the course");
         }
 
         courseRepository.delete(course);
-    }
-
-    @Transactional
-    public Media uploadMedia(Long courseId, MultipartFile file) throws IOException {
-        Course course = getCourseById(courseId);
-
-        // Check if current user is the course instructor
-        UserAccount currentUser = userService.getCurrentUser();
-        if (!course.getInstructor().getUserAccountId().equals(currentUser.getUserAccountId())) {
-            throw new RuntimeException("Only course instructor can upload media");
-        }
-
-        // Normalize file name
-        String fileName = System.currentTimeMillis() + "_" + file.getOriginalFilename();
-
-        // Copy file to the target location
-        Path targetLocation = this.fileStorageLocation.resolve(fileName);
-        Files.copy(file.getInputStream(), targetLocation);
-
-        // Create media entity
-        Media media = new Media();
-        media.setFileName(file.getOriginalFilename());
-        media.setFilePath(targetLocation.toString());
-        media.setFileType(file.getContentType());
-        media.setFileSize(file.getSize());
-        media.setCourse(course);
-
-        return mediaRepository.save(media);
-    }
-
-    private CourseDTO convertToDTO(Course course) {
-        CourseDTO dto = new CourseDTO();
-        dto.setCourseId(course.getCourseId());
-        dto.setCourseName(course.getCourseName());
-        dto.setDescription(course.getDescription());
-        dto.setDuration(course.getDuration());
-        dto.setInstructorId(course.getInstructor().getUserAccountId());
-        dto.setInstructorName(course.getInstructor().getFirstName() + " " + course.getInstructor().getLastName());
-        return dto;
+        log.info("Course deleted: {}", courseId);
     }
 }

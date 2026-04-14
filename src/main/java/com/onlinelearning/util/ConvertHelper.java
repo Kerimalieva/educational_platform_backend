@@ -3,8 +3,13 @@ package com.onlinelearning.util;
 import com.onlinelearning.dto.request.SignupRequest;
 import com.onlinelearning.dto.response.AuthResponse;
 import com.onlinelearning.dto.response.UserProfileResponse;
+import com.onlinelearning.entity.Instructor;
 import com.onlinelearning.entity.UserAccount;
 import com.onlinelearning.entity.UserType;
+import com.onlinelearning.dto.request.CourseRequest;
+import com.onlinelearning.dto.response.CourseResponse;
+import com.onlinelearning.entity.Course;
+
 
 
 public final class ConvertHelper {
@@ -40,4 +45,31 @@ public final class ConvertHelper {
         account.setUserType(userType);
         return account;
     }
+
+
+
+    public static CourseResponse toCourseResponse(Course course) {
+        if (course == null) return null;
+        return CourseResponse.builder()
+                .courseId(course.getCourseId())
+                .courseName(course.getCourseName())
+                .description(course.getDescription())
+                .duration(course.getDuration())
+                .instructorId(course.getInstructor().getUserAccountId())
+                .instructorName(course.getInstructor().getFirstName() + " " + course.getInstructor().getLastName())
+                .createdAt(course.getCreatedAt())
+                .updatedAt(course.getUpdatedAt())
+                .build();
+    }
+
+    public static Course toCourse(CourseRequest request, Instructor instructor) {
+        if (request == null) return null;
+        Course course = new Course();
+        course.setCourseName(request.getCourseName());
+        course.setDescription(request.getDescription());
+        course.setDuration(request.getDuration());
+        course.setInstructor(instructor);
+        return course;
+    }
+
 }
