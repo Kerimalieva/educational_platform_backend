@@ -1,20 +1,26 @@
 package com.onlinelearning.service;
 
-import com.onlinelearning.dto.UserProfileResponse;
-import com.onlinelearning.dto.UserUpdateRequest;
+import com.onlinelearning.dto.response.UserProfileResponse;
+import com.onlinelearning.dto.request.UserUpdateRequest;
 import com.onlinelearning.entity.UserAccount;
+import com.onlinelearning.exception.ResourceNotFoundException;
 import com.onlinelearning.repository.UserAccountRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import com.onlinelearning.util.ConvertHelper;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
+
+@Slf4j
 @Service
+@RequiredArgsConstructor
 public class UserService {
 
-    @Autowired
-    private UserAccountRepository userAccountRepository;
+    private final UserAccountRepository userAccountRepository;
 
     public UserAccount getCurrentUser() {
         Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
@@ -27,34 +33,26 @@ public class UserService {
         }
 
         return userAccountRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("User", 0L));
     }
 
     @Transactional
-    public UserAccount updateUserProfile(Long userId, UserUpdateRequest updateRequest) {
+    public UserProfileResponse updateUserProfile(Long userId, UserUpdateRequest updateRequest) {
+        log.info("Updating profile for user id: {}", userId);
         UserAccount userAccount = userAccountRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("User", userId));
 
         if (updateRequest.getFirstName() != null) {
             userAccount.setFirstName(updateRequest.getFirstName());
         }
-
         if (updateRequest.getLastName() != null) {
             userAccount.setLastName(updateRequest.getLastName());
         }
 
-        userAccount.setUpdatedAt(java.time.LocalDateTime.now());
+        userAccount.setUpdatedAt(LocalDateTime.now());
+        UserAccount updated = userAccountRepository.save(userAccount);
+        log.debug("Profile updated for user: {}", updated.getEmail());
 
-        return userAccountRepository.save(userAccount);
-    }
-
-    public UserProfileResponse convertToProfileResponse(UserAccount userAccount) {
-        UserProfileResponse response = new UserProfileResponse();
-        response.setUserAccountId(userAccount.getUserAccountId());
-        response.setEmail(userAccount.getEmail());
-        response.setFirstName(userAccount.getFirstName());
-        response.setLastName(userAccount.getLastName());
-        response.setUserType(userAccount.getUserType().getTypeName());
-        return response;
+        return ConvertHelper.toUserProfileResponse(updated);
     }
 }

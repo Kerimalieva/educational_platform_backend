@@ -1,9 +1,10 @@
 package com.onlinelearning.controller;
 
 import com.onlinelearning.dto.NotificationDTO;
-import com.onlinelearning.dto.UserProfileResponse;
-import com.onlinelearning.dto.UserUpdateRequest;
+import com.onlinelearning.dto.response.UserProfileResponse;
+import com.onlinelearning.dto.request.UserUpdateRequest;
 import com.onlinelearning.entity.UserAccount;
+import com.onlinelearning.exception.AccessDeniedException;
 import com.onlinelearning.service.NotificationService;
 import com.onlinelearning.service.UserService;
 import jakarta.validation.Valid;
@@ -27,15 +28,12 @@ public class StudentController {
             @PathVariable Long studentId,
             @Valid @RequestBody UserUpdateRequest updateRequest) {
 
-        // Проверка, что текущий пользователь обновляет свой профиль
         UserAccount currentUser = userService.getCurrentUser();
         if (!currentUser.getUserAccountId().equals(studentId)) {
-            throw new RuntimeException("You can only update your own profile");
+            throw new AccessDeniedException("You can only update your own profile");
         }
 
-        UserAccount updatedUser = userService.updateUserProfile(studentId, updateRequest);
-        UserProfileResponse response = userService.convertToProfileResponse(updatedUser);
-
+        UserProfileResponse response = userService.updateUserProfile(studentId, updateRequest);
         return ResponseEntity.ok(response);
     }
 

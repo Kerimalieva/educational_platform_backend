@@ -54,6 +54,8 @@ public class AuthService {
                 student.setEmail(request.getEmail());
                 student.setPassword(encodedPassword);
                 student.setUserType(userType);
+                student.setFirstName(request.getFirstName());
+                student.setLastName(request.getLastName());
                 userAccount = studentRepository.save(student);
                 break;
             case "INSTRUCTOR":
@@ -61,6 +63,8 @@ public class AuthService {
                 instructor.setEmail(request.getEmail());
                 instructor.setPassword(encodedPassword);
                 instructor.setUserType(userType);
+                instructor.setFirstName(request.getFirstName());
+                instructor.setLastName(request.getLastName());
                 userAccount = instructorRepository.save(instructor);
                 break;
             default:
