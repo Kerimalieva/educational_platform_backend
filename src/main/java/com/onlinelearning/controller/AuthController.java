@@ -1,40 +1,35 @@
 package com.onlinelearning.controller;
 
-import com.onlinelearning.dto.AuthResponse;
-import com.onlinelearning.dto.LoginRequest;
-import com.onlinelearning.dto.SignupRequest;
+import com.onlinelearning.dto.request.LoginRequest;
+import com.onlinelearning.dto.request.SignupRequest;
+import com.onlinelearning.dto.response.AuthResponse;
 import com.onlinelearning.service.AuthService;
 import jakarta.validation.Valid;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-@CrossOrigin(origins = "[localhost](http://localhost:5173)") // правильный синтаксис
+@Slf4j
 @RestController
 @RequestMapping("/auth")
+@RequiredArgsConstructor
 public class AuthController {
 
-    @Autowired
-    private AuthService authService;
+    private final AuthService authService;
 
     @PostMapping("/signup")
-    public ResponseEntity<?> signup(@Valid @RequestBody SignupRequest signupRequest) {
-        try {
-            AuthResponse response = authService.register(signupRequest);
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
-        }
+    public ResponseEntity<AuthResponse> signup(@Valid @RequestBody SignupRequest signupRequest) {
+        log.debug("Received signup request for email: {}", signupRequest.getEmail());
+        AuthResponse response = authService.register(signupRequest);
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping("/login")
-    public ResponseEntity<?> login(@Valid @RequestBody LoginRequest loginRequest) {
-        try {
-            AuthResponse response = authService.login(loginRequest);
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
-        }
+    public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest loginRequest) {
+        log.debug("Received login request for email: {}", loginRequest.getEmail());
+        AuthResponse response = authService.login(loginRequest);
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping("/logout")

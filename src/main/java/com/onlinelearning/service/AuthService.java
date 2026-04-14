@@ -1,138 +1,100 @@
 package com.onlinelearning.service;
 
-import com.onlinelearning.dto.*;
+import com.onlinelearning.dto.request.LoginRequest;
+import com.onlinelearning.dto.request.SignupRequest;
+import com.onlinelearning.dto.response.AuthResponse;
 import com.onlinelearning.entity.*;
+import com.onlinelearning.exception.BusinessException;
+import com.onlinelearning.exception.ResourceNotFoundException;
 import com.onlinelearning.repository.*;
 import com.onlinelearning.security.JwtUtil;
-import org.springframework.beans.factory.annotation.Autowired;
+import com.onlinelearning.util.ConvertHelper;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.User;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+@Slf4j
 @Service
+@RequiredArgsConstructor
 public class AuthService {
 
-    @Autowired
-    private AuthenticationManager authenticationManager;
+    private final AuthenticationManager authenticationManager;
+    private final JwtUtil jwtUtil;
+    private final PasswordEncoder passwordEncoder;
+    private final UserAccountRepository userAccountRepository;
+    private final StudentRepository studentRepository;
+    private final InstructorRepository instructorRepository;
+    private final UserTypeRepository userTypeRepository;
 
-    @Autowired
-    private JwtUtil jwtUtil;
-
-    @Autowired
-    private PasswordEncoder passwordEncoder;
-
-    @Autowired
-    private UserAccountRepository userAccountRepository;
-
-    @Autowired
-    private StudentRepository studentRepository;
-
-    @Autowired
-    private InstructorRepository instructorRepository;
-
-    @Autowired
-    private UserTypeRepository userTypeRepository;
-
-    // ====================== REGISTER ======================
     @Transactional
-    public AuthResponse register(SignupRequest signupRequest) {
-        // Проверяем, существует ли пользователь
-        if (userAccountRepository.existsByEmail(signupRequest.getEmail())) {
-            throw new RuntimeException("Email already exists");
+    public AuthResponse register(SignupRequest request) {
+        log.info("Registering new user with email: {}", request.getEmail());
+
+        if (userAccountRepository.existsByEmail(request.getEmail())) {
+            throw new BusinessException("Email already exists", "DUPLICATE_EMAIL");
         }
 
-        // Получаем userType по имени роли ("STUDENT" / "INSTRUCTOR")
-        String roleName = signupRequest.getRole().toUpperCase();
+        String roleName = request.getRole().toUpperCase();
         UserType userType = userTypeRepository.findByTypeName(roleName)
-                .orElseThrow(() -> new RuntimeException("Invalid user type: " + roleName));
+                .orElseThrow(() -> new BusinessException("Invalid user type: " + roleName, "INVALID_ROLE"));
 
-        // Шифруем пароль
-        String encodedPassword = passwordEncoder.encode(signupRequest.getPassword());
+        String encodedPassword = passwordEncoder.encode(request.getPassword());
+
         UserAccount userAccount;
-
-        // Создание пользователя по типу
         switch (roleName) {
             case "STUDENT":
                 Student student = new Student();
-                student.setEmail(signupRequest.getEmail());
+                student.setEmail(request.getEmail());
                 student.setPassword(encodedPassword);
                 student.setUserType(userType);
                 userAccount = studentRepository.save(student);
                 break;
             case "INSTRUCTOR":
                 Instructor instructor = new Instructor();
-                instructor.setEmail(signupRequest.getEmail());
+                instructor.setEmail(request.getEmail());
                 instructor.setPassword(encodedPassword);
                 instructor.setUserType(userType);
                 userAccount = instructorRepository.save(instructor);
                 break;
             default:
-                UserAccount newUser = new UserAccount();
-                newUser.setEmail(signupRequest.getEmail());
-                newUser.setPassword(encodedPassword);
-                newUser.setUserType(userType);
-                userAccount = userAccountRepository.save(newUser);
-                break;
+                throw new BusinessException("Unsupported role", "INVALID_ROLE");
         }
 
-        // Аутентифицируем пользователя, чтобы сразу выдать JWT
-        Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(signupRequest.getEmail(), signupRequest.getPassword())
+        log.debug("User saved with id: {}", userAccount.getUserAccountId());
+
+        Authentication auth = authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
         );
-        SecurityContextHolder.getContext().setAuthentication(authentication);
+        SecurityContextHolder.getContext().setAuthentication(auth);
+        String jwt = jwtUtil.generateToken((User) auth.getPrincipal());
 
-        // Генерируем JWT-токен
-        String jwt = jwtUtil.generateToken(
-                (org.springframework.security.core.userdetails.User) authentication.getPrincipal()
-        );
-
-        // Формируем ответ
-        AuthResponse response = new AuthResponse();
-        response.setToken(jwt);
-        response.setEmail(userAccount.getEmail());
-        response.setFirstName(userAccount.getFirstName());
-        response.setLastName(userAccount.getLastName());
-        response.setUserId(userAccount.getUserAccountId());
-        response.setUserType(userType.getTypeName());
-
-        return response;
+        return ConvertHelper.toAuthResponse(userAccount, jwt);
     }
 
-    // ====================== LOGIN (без роли) ======================
-    public AuthResponse login(LoginRequest loginRequest) {
-        // Проверяем email/пароль
-        Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(loginRequest.getEmail(), loginRequest.getPassword())
+    public AuthResponse login(LoginRequest request) {
+        log.info("Login attempt for email: {}", request.getEmail());
+
+        Authentication auth = authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
         );
-        SecurityContextHolder.getContext().setAuthentication(authentication);
+        SecurityContextHolder.getContext().setAuthentication(auth);
 
-        // Генерация JWT
-        String jwt = jwtUtil.generateToken(
-                (org.springframework.security.core.userdetails.User) authentication.getPrincipal()
-        );
+        UserAccount userAccount = userAccountRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> new ResourceNotFoundException("User", 0L));
 
-        // Получаем данные учетной записи
-        UserAccount userAccount = userAccountRepository.findByEmail(loginRequest.getEmail())
-                .orElseThrow(() -> new RuntimeException("User not found"));
-
-        // Формируем AuthResponse
-        AuthResponse response = new AuthResponse();
-        response.setToken(jwt);
-        response.setEmail(userAccount.getEmail());
-        response.setFirstName(userAccount.getFirstName());
-        response.setLastName(userAccount.getLastName());
-        response.setUserId(userAccount.getUserAccountId());
-        response.setUserType(userAccount.getUserType().getTypeName());
-
-        return response;
+        String jwt = jwtUtil.generateToken((User) auth.getPrincipal());
+        return ConvertHelper.toAuthResponse(userAccount, jwt);
     }
 
-    // ====================== LOGOUT ======================
     public void logout() {
+        log.info("Logout request, clearing security context");
         SecurityContextHolder.clearContext();
     }
 }
