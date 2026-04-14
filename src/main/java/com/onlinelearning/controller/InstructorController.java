@@ -1,6 +1,7 @@
 package com.onlinelearning.controller;
 
 import com.onlinelearning.dto.NotificationDTO;
+import com.onlinelearning.dto.response.NotificationResponse;
 import com.onlinelearning.dto.response.UserProfileResponse;
 import com.onlinelearning.dto.request.UserUpdateRequest;
 import com.onlinelearning.entity.UserAccount;
@@ -37,27 +38,31 @@ public class InstructorController {
         return ResponseEntity.ok(response);
     }
 
-    @GetMapping("/notifications/{userId}")
-    public ResponseEntity<List<NotificationDTO>> getAllNotifications(@PathVariable Long userId) {
-        // Проверка, что пользователь запрашивает свои уведомления
-        UserAccount currentUser = userService.getCurrentUser();
-        if (!currentUser.getUserAccountId().equals(userId)) {
-            throw new RuntimeException("You can only view your own notifications");
-        }
 
-        List<NotificationDTO> notifications = notificationService.getAllNotifications(userId);
+    @GetMapping("/notifications")
+    public ResponseEntity<List<NotificationResponse>> getAllNotifications() {
+        UserAccount currentUser = userService.getCurrentUser();
+        List<NotificationResponse> notifications = notificationService.getAllNotifications(currentUser.getUserAccountId());
         return ResponseEntity.ok(notifications);
     }
 
-    @GetMapping("/unreadnotifications/{userId}")
-    public ResponseEntity<List<NotificationDTO>> getUnreadNotifications(@PathVariable Long userId) {
-        // Проверка, что пользователь запрашивает свои уведомления
+    @GetMapping("/notifications/unread")
+    public ResponseEntity<List<NotificationResponse>> getUnreadNotifications() {
         UserAccount currentUser = userService.getCurrentUser();
-        if (!currentUser.getUserAccountId().equals(userId)) {
-            throw new RuntimeException("You can only view your own notifications");
-        }
-
-        List<NotificationDTO> notifications = notificationService.getUnreadNotifications(userId);
+        List<NotificationResponse> notifications = notificationService.getUnreadNotifications(currentUser.getUserAccountId());
         return ResponseEntity.ok(notifications);
+    }
+
+    @PutMapping("/notifications/mark-read/{notificationId}")
+    public ResponseEntity<Void> markAsRead(@PathVariable Long notificationId) {
+        notificationService.markAsRead(notificationId);
+        return ResponseEntity.ok().build();
+    }
+
+    @PutMapping("/notifications/mark-all-read")
+    public ResponseEntity<Void> markAllAsRead() {
+        UserAccount currentUser = userService.getCurrentUser();
+        notificationService.markAllAsRead(currentUser.getUserAccountId());
+        return ResponseEntity.ok().build();
     }
 }

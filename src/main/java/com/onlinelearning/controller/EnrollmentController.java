@@ -1,72 +1,73 @@
 package com.onlinelearning.controller;
 
-import com.onlinelearning.dto.EnrollmentDTO;
-import com.onlinelearning.entity.Course;
-import com.onlinelearning.entity.Enrollment;
-import com.onlinelearning.entity.Student;
+import com.onlinelearning.dto.request.EnrollmentRequest;
+import com.onlinelearning.dto.response.EnrollmentResponse;
 import com.onlinelearning.service.EnrollmentService;
 import com.onlinelearning.service.UserService;
 import jakarta.validation.Valid;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
 import java.util.List;
 
+@Slf4j
 @RestController
 @RequestMapping("/enrollment")
+@RequiredArgsConstructor
 public class EnrollmentController {
 
-    @Autowired
-    private EnrollmentService enrollmentService;
+    private final EnrollmentService enrollmentService;
+    private final UserService userService;
 
-    @Autowired
-    private UserService userService;
+    @PostMapping("/enroll")
+    public ResponseEntity<EnrollmentResponse> enrollStudent(@Valid @RequestBody EnrollmentRequest request) {
+        log.debug("REST request to enroll student {} into course {}", request.getStudentId(), request.getCourseId());
+        EnrollmentResponse response = enrollmentService.enrollStudent(request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
 
-    // === НОВЫЕ ЭНДПОИНТЫ ДЛЯ ФРОНТА ===
-
-    // Получить курсы, на которые записан текущий студент
     @GetMapping("/my-courses")
-    public ResponseEntity<List<Course>> getMyCourses() {
-        Student student = (Student) userService.getCurrentUser();
-        List<Course> courses = enrollmentService.getCoursesByStudent(student.getUserAccountId());
+    public ResponseEntity<List<com.onlinelearning.entity.Course>> getMyCourses() {
+        log.debug("REST request to get my courses");
+        com.onlinelearning.entity.Student student = (com.onlinelearning.entity.Student) userService.getCurrentUser();
+        List<com.onlinelearning.entity.Course> courses = enrollmentService.getCoursesByStudent(student.getUserAccountId());
         return ResponseEntity.ok(courses);
     }
 
-    // Записаться на курс (текущий студент)
-    @PostMapping("/enroll/{courseId}")
-    public ResponseEntity<?> enrollStudent(@PathVariable Long courseId) {
-        Student student = (Student) userService.getCurrentUser();
-        Enrollment enrollment = enrollmentService.enrollStudent(student.getUserAccountId(), courseId);
-        return ResponseEntity.ok(enrollment);
+    @PostMapping("/enroll/current/{courseId}")
+    public ResponseEntity<EnrollmentResponse> enrollCurrentStudent(@PathVariable Long courseId) {
+        log.debug("REST request to enroll current student into course {}", courseId);
+        com.onlinelearning.entity.Student student = (com.onlinelearning.entity.Student) userService.getCurrentUser();
+        EnrollmentRequest request = EnrollmentRequest.builder()
+                .studentId(student.getUserAccountId())
+                .courseId(courseId)
+                .build();
+        EnrollmentResponse response = enrollmentService.enrollStudent(request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
-    // Отписаться от курса (текущий студент)
     @DeleteMapping("/unenroll/{courseId}")
-    public ResponseEntity<?> unenrollStudent(@PathVariable Long courseId) {
-        Student student = (Student) userService.getCurrentUser();
+    public ResponseEntity<Void> unenrollCurrentStudent(@PathVariable Long courseId) {
+        log.debug("REST request to unenroll current student from course {}", courseId);
+        com.onlinelearning.entity.Student student = (com.onlinelearning.entity.Student) userService.getCurrentUser();
         enrollmentService.unenrollStudent(student.getUserAccountId(), courseId);
-        return ResponseEntity.ok().build();
+        return ResponseEntity.noContent().build();
     }
 
-    // === СТАРЫЕ ЭНДПОИНТЫ (можно оставить для совместимости) ===
-
-    @PostMapping("/enroll")
-    public ResponseEntity<Enrollment> enrollStudent(@Valid @RequestBody EnrollmentDTO enrollmentDTO) {
-        Enrollment enrollment = enrollmentService.enrollStudent(enrollmentDTO);
-        return ResponseEntity.ok(enrollment);
+    @GetMapping("/course/{courseId}")
+    public ResponseEntity<List<EnrollmentResponse>> getEnrollmentsByCourse(@PathVariable Long courseId) {
+        log.debug("REST request to get enrollments for course {}", courseId);
+        List<EnrollmentResponse> responses = enrollmentService.getEnrollmentsByCourse(courseId);
+        return ResponseEntity.ok(responses);
     }
 
-    @GetMapping("/view_enrolled_students/{courseId}")
-    public ResponseEntity<List<EnrollmentDTO>> viewEnrolledStudents(@PathVariable Long courseId) {
-        List<EnrollmentDTO> enrollments = enrollmentService.getEnrollmentsByCourse(courseId);
-        return ResponseEntity.ok(enrollments);
-    }
-
-    @DeleteMapping("/remove_enrolled_student/student_id/{studentId}/course_id/{courseId}")
-    public ResponseEntity<Void> removeEnrolledStudent(
-            @PathVariable Long studentId,
-            @PathVariable Long courseId) {
-        enrollmentService.removeEnrollment(studentId, courseId);
-        return ResponseEntity.ok().build();
+    @DeleteMapping("/remove/{studentId}/{courseId}")
+    public ResponseEntity<Void> removeEnrollment(@PathVariable Long studentId, @PathVariable Long courseId) {
+        log.debug("REST request to remove student {} from course {}", studentId, courseId);
+        enrollmentService.unenrollStudent(studentId, courseId);
+        return ResponseEntity.noContent().build();
     }
 }
