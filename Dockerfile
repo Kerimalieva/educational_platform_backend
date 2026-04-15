@@ -1,12 +1,15 @@
-FROM openjdk:21-jdk-slim AS builder
+FROM maven:3.9.6-eclipse-temurin-21-alpine AS builder
 
 WORKDIR /app
 
-COPY . .
-RUN chmod +x mvnw
-RUN ./mvnw clean package -DskipTests
+COPY pom.xml .
+RUN mvn dependency:go-offline
 
-FROM openjdk:21-jdk-slim
+COPY src ./src
+RUN mvn clean package -DskipTests
+
+FROM eclipse-temurin:21-jre-alpine
+
 WORKDIR /app
 
 COPY --from=builder /app/target/*.jar app.jar
