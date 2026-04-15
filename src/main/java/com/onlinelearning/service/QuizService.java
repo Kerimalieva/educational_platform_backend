@@ -44,7 +44,6 @@ public class QuizService {
         Course course = courseRepository.findById(quizDTO.getCourseId())
                 .orElseThrow(() -> new RuntimeException("Course not found"));
 
-        // Check if current user is the course instructor
         UserAccount currentUser = userService.getCurrentUser();
         if (!course.getInstructor().getUserAccountId().equals(currentUser.getUserAccountId())) {
             throw new RuntimeException("Only course instructor can create quizzes");
@@ -63,7 +62,6 @@ public class QuizService {
         Course course = courseRepository.findById(courseId)
                 .orElseThrow(() -> new RuntimeException("Course not found"));
 
-        // Check if current user is the course instructor
         UserAccount currentUser = userService.getCurrentUser();
         if (!course.getInstructor().getUserAccountId().equals(currentUser.getUserAccountId())) {
             throw new RuntimeException("Only course instructor can add questions");
@@ -88,7 +86,6 @@ public class QuizService {
         Course course = courseRepository.findById(questionDTO.getCourseId())
                 .orElseThrow(() -> new RuntimeException("Course not found"));
 
-        // Check if current user is the course instructor
         UserAccount currentUser = userService.getCurrentUser();
         if (!course.getInstructor().getUserAccountId().equals(currentUser.getUserAccountId())) {
             throw new RuntimeException("Only course instructor can add questions");
@@ -132,13 +129,11 @@ public class QuizService {
         Student student = studentRepository.findById(studentId)
                 .orElseThrow(() -> new RuntimeException("Student not found"));
 
-        // Check if already graded
         quizGradeRepository.findByStudentUserAccountIdAndQuizQuizId(studentId, quizId)
                 .ifPresent(grade -> {
                     throw new RuntimeException("Quiz already submitted");
                 });
 
-        // Calculate grade
         List<Question> questions = questionRepository.findByQuizQuizId(quizId);
         double score = 0;
         double total = questions.size();
@@ -151,7 +146,6 @@ public class QuizService {
 
         double gradePercentage = (score / total) * 100;
 
-        // Save grade
         QuizGrade quizGrade = new QuizGrade();
         quizGrade.setStudent(student);
         quizGrade.setQuiz(quiz);
@@ -165,7 +159,6 @@ public class QuizService {
 
         QuizGrade savedGrade = quizGradeRepository.save(quizGrade);
 
-        // Create notification
         Notification notification = new Notification(
                 "Your quiz has been graded: " + String.format("%.1f", gradePercentage) + "%",
                 "grade",
@@ -190,7 +183,6 @@ public class QuizService {
     public List<QuizGrade> getQuizGrades(Long quizId) {
         Quiz quiz = getQuizById(quizId);
 
-        // Check if current user is the course instructor
         UserAccount currentUser = userService.getCurrentUser();
         if (!quiz.getCourse().getInstructor().getUserAccountId().equals(currentUser.getUserAccountId())) {
             throw new RuntimeException("Only course instructor can view grades");

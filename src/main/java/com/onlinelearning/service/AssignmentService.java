@@ -50,7 +50,6 @@ public class AssignmentService {
         Assignment savedAssignment = assignmentRepository.save(assignment);
         log.info("Assignment saved with id: {}", savedAssignment.getAssignmentId());
 
-        // Уведомления студентам
         List<Enrollment> enrollments = course.getEnrollments().stream().collect(Collectors.toList());
         for (Enrollment enrollment : enrollments) {
             Notification notification = new Notification(
