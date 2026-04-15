@@ -23,7 +23,6 @@ public class DataInitializer implements CommandLineRunner {
 
     @Override
     public void run(String... args) throws Exception {
-        // Создаем типы пользователей
         if (userTypeRepository.count() == 0) {
             UserType admin = new UserType("ADMIN");
             UserType instructor = new UserType("INSTRUCTOR");
@@ -36,7 +35,6 @@ public class DataInitializer implements CommandLineRunner {
             System.out.println("User types initialized successfully");
         }
 
-        // Создаем тестового администратора (опционально)
         if (!userAccountRepository.findByEmail("admin@example.com").isPresent()) {
             UserType adminType = userTypeRepository.findByTypeName("ADMIN")
                     .orElseThrow(() -> new RuntimeException("ADMIN type not found"));
