@@ -10,7 +10,7 @@ import java.util.Set;
 @PrimaryKeyJoinColumn(name = "user_account_id")
 public class Instructor extends UserAccount {
 
-    @OneToMany(mappedBy = "instructor", cascade = CascadeType.ALL)
+    @OneToMany(mappedBy = "instructor", cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonIgnore
     private Set<Course> courses = new HashSet<>();
 

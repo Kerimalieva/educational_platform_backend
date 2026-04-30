@@ -12,11 +12,9 @@ public class AuthRequest {
     @NotBlank(message = "Password is required")
     private String password;
 
-    // Changed from userTypeId to role
     @NotBlank(message = "Role is required")
     private String role;
 
-    // Getters and Setters
     public String getEmail() {
         return email;
     }

@@ -10,19 +10,19 @@ import java.util.Set;
 @PrimaryKeyJoinColumn(name = "user_account_id")
 public class Student extends UserAccount {
 
-    @OneToMany(mappedBy = "student", cascade = CascadeType.ALL)
+    @OneToMany(mappedBy = "student", cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonIgnore
     private Set<Enrollment> enrollments = new HashSet<>();
 
-    @OneToMany(mappedBy = "student", cascade = CascadeType.ALL)
+    @OneToMany(mappedBy = "student", cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonIgnore
     private Set<Attendance> attendances = new HashSet<>();
 
-    @OneToMany(mappedBy = "student", cascade = CascadeType.ALL)
+    @OneToMany(mappedBy = "student", cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonIgnore
     private Set<AssignmentSubmission> assignmentSubmissions = new HashSet<>();
 
-    @OneToMany(mappedBy = "student", cascade = CascadeType.ALL)
+    @OneToMany(mappedBy = "student", cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonIgnore
     private Set<QuizGrade> quizGrades = new HashSet<>();
 

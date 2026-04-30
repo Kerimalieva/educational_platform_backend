@@ -22,7 +22,7 @@ public class Course {
     private String description;
 
     @Column(name = "duration")
-    private Integer duration; // in days
+    private Integer duration;
 
     @Column(name = "created_at")
     private LocalDateTime createdAt;
@@ -34,25 +34,28 @@ public class Course {
     @JoinColumn(name = "instructor_id", nullable = false)
     private Instructor instructor;
 
-    @OneToMany(mappedBy = "course", cascade = CascadeType.ALL)
+    @OneToMany(mappedBy = "course", cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonIgnore
     private Set<Lesson> lessons = new HashSet<>();
 
-    @OneToMany(mappedBy = "course", cascade = CascadeType.ALL)
+    @OneToMany(mappedBy = "course", cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonIgnore
     private Set<Enrollment> enrollments = new HashSet<>();
 
-    @OneToMany(mappedBy = "course", cascade = CascadeType.ALL)
+    @OneToMany(mappedBy = "course", cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonIgnore
     private Set<Assignment> assignments = new HashSet<>();
 
-    @OneToMany(mappedBy = "course", cascade = CascadeType.ALL)
+    @OneToMany(mappedBy = "course", cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonIgnore
     private Set<Quiz> quizzes = new HashSet<>();
 
-    @OneToMany(mappedBy = "course", cascade = CascadeType.ALL)
+    @OneToMany(mappedBy = "course", cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonIgnore
     private Set<Media> mediaFiles = new HashSet<>();
+
+    @OneToMany(mappedBy = "course", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Set<Question> questions = new HashSet<>();
 
     // Constructors
     public Course() {
