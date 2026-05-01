@@ -15,7 +15,6 @@ Supports role-based access (**Student / Instructor / Admin**), course management
 | Instructor | instructor@test.com | Password123! |
 | Admin      | admin@example.com   | admin123     |
 
-(Passwords are shown as plain text for testing purposes. In production, use strong credentials.)
 
 ## Problem
 
