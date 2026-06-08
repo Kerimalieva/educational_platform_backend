@@ -48,5 +48,33 @@ public class DataInitializer implements CommandLineRunner {
             userAccountRepository.save(admin);
             System.out.println("Test admin created");
         }
+
+        if (!userAccountRepository.findByEmail("instructor@test.com").isPresent()) {
+            UserType instructorType = userTypeRepository.findByTypeName("INSTRUCTOR")
+                    .orElseThrow(() -> new RuntimeException("INSTRUCTOR type not found"));
+
+            UserAccount instructor = new UserAccount();
+            instructor.setEmail("instructor@test.com");
+            instructor.setPassword(passwordEncoder.encode("Password123!"));
+            instructor.setFirstName("John");
+            instructor.setLastName("Doe");
+            instructor.setUserType(instructorType);
+            userAccountRepository.save(instructor);
+            System.out.println("Test instructor created");
+        }
+
+        if (!userAccountRepository.findByEmail("student@test.com").isPresent()) {
+            UserType studentType = userTypeRepository.findByTypeName("STUDENT")
+                    .orElseThrow(() -> new RuntimeException("STUDENT type not found"));
+
+            UserAccount student = new UserAccount();
+            student.setEmail("student@test.com");
+            student.setPassword(passwordEncoder.encode("Password123!"));
+            student.setFirstName("Jane");
+            student.setLastName("Smith");
+            student.setUserType(studentType);
+            userAccountRepository.save(student);
+            System.out.println("Test student created");
+        }
     }
 }
